@@ -1,0 +1,42 @@
+[
+  {
+    "question": "Quantos dias de férias eu tenho por ano?",
+    "expected_sources": ["politica_ferias.md"],
+    "reference_answer": "30 dias corridos a cada 12 meses de trabalho (período aquisitivo)."
+  },
+  {
+    "question": "Posso dividir minhas férias em partes? Quais as regras?",
+    "expected_sources": ["politica_ferias.md"],
+    "reference_answer": "Sim, em até três períodos: um com no mínimo 14 dias corridos e os demais com no mínimo 5 dias cada; não pode iniciar nos dois dias antes de feriado ou DSR."
+  },
+  {
+    "question": "Qual formulário uso para vender 10 dias de férias?",
+    "expected_sources": ["politica_ferias.md"],
+    "reference_answer": "O formulário FER-07, no portal RH-Online, até 15 dias antes do fim do período aquisitivo."
+  },
+  {
+    "question": "O que é o chamado TI-1180?",
+    "expected_sources": ["politica_ferias.md"],
+    "reference_answer": "É o chamado padrão do time de TI que bloqueia o acesso aos sistemas corporativos durante as férias."
+  },
+  {
+    "question": "Quanto tempo dura a licença do pai quando nasce um filho?",
+    "expected_sources": ["politica_ferias.md"],
+    "reference_answer": "20 dias corridos, pois a empresa participa do programa Empresa Cidadã."
+  },
+  {
+    "question": "Por que combinar BM25 com busca vetorial?",
+    "expected_sources": ["guia_rag.md"],
+    "reference_answer": "Porque a busca vetorial entende sinônimos mas erra termos exatos, e o BM25 acerta termos exatos mas não entende paráfrases; a fusão RRF combina as duas."
+  },
+  {
+    "question": "Qual o valor de k usado no Reciprocal Rank Fusion?",
+    "expected_sources": ["guia_rag.md"],
+    "reference_answer": "k = 60."
+  },
+  {
+    "question": "Qual é o valor do vale-refeição?",
+    "expected_sources": [],
+    "reference_answer": "A informação não está nos documentos; o sistema deve dizer que não encontrou."
+  }
+]

@@ -1,0 +1,31 @@
+# Geração: Claude (API) ou modelo local (Ollama)
+anthropic>=0.70
+ollama>=0.4
+
+# Ingestão
+langchain-text-splitters>=0.3
+pypdf>=5.0
+python-docx>=1.1
+python-dotenv>=1.0
+
+# Embeddings e re-ranking locais (BAAI/bge-m3, bge-reranker-v2-m3)
+# torch >= 2.6 é obrigatório para carregar o bge-m3 (CVE-2025-32434 no torch.load).
+# Versão só CPU, bem menor:  pip install torch --index-url https://download.pytorch.org/whl/cpu
+torch>=2.6
+sentence-transformers>=3.0
+
+# Vector store e busca por keyword
+chromadb>=1.0
+rank-bm25>=0.2.2
+
+# Opcionais
+# qdrant-client>=1.12   # VECTOR_BACKEND=qdrant
+# openai>=1.50          # EMBEDDING_BACKEND=openai
+
+# Testes
+pytest>=8.0
+
+# Interface web (app/server.py)
+fastapi>=0.115
+uvicorn>=0.30
+python-multipart>=0.0.9
