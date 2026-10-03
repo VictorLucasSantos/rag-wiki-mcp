@@ -4,3 +4,7 @@ __pycache__/
 .env
 data/
 eval/results/
+
+# Documentos indexados (podem ser privados). Exemplos ficam em examples/
+docs/*
+!docs/.gitkeep

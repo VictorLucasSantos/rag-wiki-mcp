@@ -22,6 +22,7 @@ pip install -r requirements.txt
 #    (ollama pull qwen3.5:4b). Para usar Claude: LLM_BACKEND=anthropic + ANTHROPIC_API_KEY
 
 # 3. Coloque seus arquivos em docs/ (.md .txt .pdf .docx .html) e indexe
+#    (para testar com os exemplos fictícios: copie examples/*.md para docs/)
 python scripts/index_documents.py --source docs
 
 # 4. Pergunte
@@ -47,7 +48,8 @@ Na primeira execução o bge-m3 (~2 GB) é baixado do Hugging Face.
 
 ```
 config.py                      # TODAS as decisões de arquitetura (também via .env)
-docs/                          # documentos a indexar (2 exemplos fictícios)
+docs/                          # SEUS documentos a indexar (ignorada pelo git)
+examples/                      # 2 documentos fictícios usados pelo eval/golden_set.json
 eval/golden_set.json           # perguntas + fontes esperadas + respostas de referência
 data/                          # índice Chroma + docstore parent-child (gerado)
 
