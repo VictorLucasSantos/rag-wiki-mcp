@@ -100,3 +100,47 @@ def test_ollama_request_shape_and_think_tags():
 
 def test_parse_json_strips_code_fences():
     assert parse_json(LLMResponse(text='```json\n{"a": 1}\n```')) == {"a": 1}
+
+
+# ── Histórico da conversa ──
+
+from src.generation.prompt_builder import HISTORY_RULE, format_history
+from src.retrieval.query_transform import QueryTransformer
+
+HISTORY = [
+    {"role": "user", "content": "Quantos dias de férias eu tenho?"},
+    {"role": "assistant", "content": "São 30 dias corridos [1][2]."},
+]
+
+
+def test_format_history_strips_old_citations():
+    block = format_history(HISTORY)
+    assert block.startswith("<historico>") and "Usuário: Quantos dias" in block
+    assert "Assistente: São 30 dias corridos." in block and "[1]" not in block
+
+
+def test_format_history_keeps_most_recent_within_budget():
+    history = [{"role": "user", "content": f"pergunta {i} " + "x" * 50} for i in range(10)]
+    block = format_history(history, max_chars=200)
+    assert "pergunta 9" in block and "pergunta 0" not in block
+    assert format_history([]) == "" and format_history(None) == ""
+
+
+def test_build_messages_with_history_adds_block_and_rule():
+    system, content, _ = build_messages("E posso vender?", make_docs(1), history=HISTORY)
+    assert HISTORY_RULE in system
+    assert content.index("<historico>") < content.index("<documentos>") < content.index("<pergunta>")
+    system, content, _ = build_messages("E posso vender?", make_docs(1))
+    assert HISTORY_RULE not in system and "<historico>" not in content
+
+
+def test_condense_rewrites_and_falls_back():
+    llm = FakeLLM('"Posso vender parte das minhas férias?"')
+    assert QueryTransformer(llm).condense("E posso vender?", format_history(HISTORY)) == "Posso vender parte das minhas férias?"
+    assert "<historico>" in llm.calls[0][0]
+    # Sem histórico: nem chama o LLM
+    llm = FakeLLM("x")
+    assert QueryTransformer(llm).condense("E posso vender?", "") == "E posso vender?" and llm.calls == []
+    # Resposta vazia ou que virou um texto longo: fica a pergunta original
+    assert QueryTransformer(FakeLLM("")).condense("E posso?", "<historico>…") == "E posso?"
+    assert QueryTransformer(FakeLLM("y" * 500)).condense("E posso?", "<historico>…") == "E posso?"

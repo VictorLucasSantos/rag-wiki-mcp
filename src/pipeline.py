@@ -201,13 +201,18 @@ class RAGPipeline:
         if rc.use_reranker and self._reranker is None:
             from src.retrieval.reranker import CrossEncoderReranker
             self._reranker = CrossEncoderReranker(rc.reranker_model, device=config.embedding_config.device)
-        if (rc.multi_query or rc.use_hyde) and self._query_transformer is None:
-            from src.retrieval.query_transform import QueryTransformer
-            self._query_transformer = QueryTransformer(get_llm("aux"))
 
         self.retriever.config = rc
         self.retriever.reranker = self._reranker if rc.use_reranker else None
-        self.retriever.query_transformer = self._query_transformer if (rc.multi_query or rc.use_hyde) else None
+        self.retriever.query_transformer = self.query_transformer if (rc.multi_query or rc.use_hyde) else None
+
+    @property
+    def query_transformer(self):
+        """Multi-query, HyDE e condensação de perguntas (modelo auxiliar). Criado na primeira vez que for usado."""
+        if self._query_transformer is None:
+            from src.retrieval.query_transform import QueryTransformer
+            self._query_transformer = QueryTransformer(get_llm("aux"))
+        return self._query_transformer
 
     def set_embedding(self, embedder, vector_store) -> None:
         """Troca o modelo de embedding (e o índice correspondente) sem recarregar o resto."""
@@ -232,15 +237,27 @@ class RAGPipeline:
                 max_tokens=lc.max_tokens if lc.backend == "anthropic" else 2048,
                 max_context_chars=gc.max_context_chars,
                 reorder=gc.reorder_lost_in_middle,
+                max_history_chars=gc.max_history_chars,
             )
         return self._generator
 
     def retrieve(self, question: str, filters: dict | None = None) -> dict:
         return self.retriever.retrieve(question, filters=filters)
 
-    def ask(self, question: str, filters: dict | None = None, stream=None) -> dict:
-        """stream: callback opcional on_text(str) para exibir a resposta conforme chega."""
-        retrieval = self.retrieve(question, filters)
-        result = self.generator.generate(question, retrieval["docs"], on_text=stream)
+    def ask(self, question: str, filters: dict | None = None, stream=None, history: list[dict] | None = None) -> dict:
+        """
+        stream: callback opcional on_text(str) para exibir a resposta conforme chega.
+        history: trocas anteriores da conversa, [{"role": "user"|"assistant", "content": str}, ...].
+          Com histórico, a busca usa a pergunta reescrita como independente
+          (result["search_query"]) e a geração recebe as últimas trocas como contexto.
+        """
+        search_query = question
+        if history:
+            from src.generation.prompt_builder import format_history
+            block = format_history(history, config.generation_config.max_history_chars)
+            search_query = self.query_transformer.condense(question, block)
+        retrieval = self.retrieve(search_query, filters)
+        result = self.generator.generate(question, retrieval["docs"], on_text=stream, history=history)
         result["retrieval"] = retrieval
+        result["search_query"] = search_query
         return result

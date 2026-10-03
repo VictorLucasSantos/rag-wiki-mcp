@@ -46,7 +46,7 @@ from fastapi.responses import FileResponse, StreamingResponse
 from pydantic import BaseModel, Field
 
 import config
-from app.conversations import ConversationStore
+from app.conversations import ConversationStore, history_from
 from src.ingestion.loader import DocumentLoader
 from src.pipeline import Indexer, RAGPipeline, build_embedder, build_vector_store, collection_for
 
@@ -425,6 +425,8 @@ class Question(BaseModel):
     question: str
     # Conversa onde salvar; None (ou id inexistente) = cria uma nova
     conversation_id: str | None = None
+    # Usa as últimas trocas da conversa para entender perguntas de acompanhamento
+    use_history: bool = True
     # None = usa o padrão do config/.env
     rerank: bool | None = None
     hyde: bool | None = None
@@ -444,6 +446,7 @@ def ask(q: Question):
     conv = conversations.get(q.conversation_id) if q.conversation_id else None
     if not conv:
         conv = conversations.create(question)
+    history = history_from(conv, config.generation_config.history_turns) if q.use_history else []
     conversations.add_message(conv["id"], "user", question)
 
     def work(emit):
@@ -454,20 +457,21 @@ def ask(q: Question):
                 if config.llm_config.backend == "ollama":
                     lc = config.llm_config
                     pipeline.generator.llm.model = q.model or lc.ollama_model
-                    if pipeline._query_transformer:  # existe se multi-query/HyDE já foram ligados
-                        pipeline._query_transformer.llm.model = q.model or lc.ollama_aux_model
+                    pipeline.query_transformer.llm.model = q.model or lc.ollama_aux_model
                 reranker = pipeline.retriever.reranker
                 if reranker and reranker._model is None:
                     # O modelo é lazy: carrega aqui para o aviso aparecer durante a espera
                     emit("status", "Carregando o reranker (na primeira vez baixa ~2,3 GB)…")
                     reranker.model
                 rc = pipeline.retriever.config
-                steps = [f"{rc.multi_query} variações da pergunta"] if rc.multi_query else []
+                steps = ["a pergunta completa a partir da conversa"] if history else []
+                if rc.multi_query:
+                    steps.append(f"{rc.multi_query} variações da pergunta")
                 if rc.use_hyde:
                     steps.append("documento hipotético (HyDE)")
                 if steps:
                     emit("status", f"Gerando {' e '.join(steps)}…")
-                result = pipeline.ask(question, stream=lambda t: emit("token", t))
+                result = pipeline.ask(question, stream=lambda t: emit("token", t), history=history)
                 index_used = {"embedding_model": pipeline.embedder.model_name, "chunker": _state["indexer"].strategy}
         except Exception as e:
             conversations.add_message(conv["id"], "assistant", str(e), {"error": True})
@@ -484,9 +488,12 @@ def ask(q: Question):
             "model": result["model"],
             "hyde": result["retrieval"]["hyde"],
             "queries": result["retrieval"]["queries"][1:],
-            "options": {"rerank": rc.use_reranker, "hyde": rc.use_hyde, "multi_query": rc.multi_query},
+            "options": {"rerank": rc.use_reranker, "hyde": rc.use_hyde, "multi_query": rc.multi_query,
+                        "history": len(history) // 2},
             "index": index_used,
         }
+        if result["search_query"] != question:
+            meta["search_query"] = result["search_query"]
         conversations.add_message(conv["id"], "assistant", result["answer"], meta)
         emit("done", {"answer": result["answer"], **meta})
 

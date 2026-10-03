@@ -6,7 +6,7 @@ Uso:
   python scripts/query.py -q "..." -v                 # mostra os chunks recuperados
   python scripts/query.py -q "..." --rerank --multi-query 3 --hyde
   python scripts/query.py --retrieve-only -q "..."    # só a busca, sem chamar o LLM
-  python scripts/query.py                             # modo interativo
+  python scripts/query.py                             # modo interativo (lembra da conversa)
 """
 
 import argparse
@@ -16,6 +16,7 @@ from pathlib import Path
 sys.stdout.reconfigure(encoding="utf-8")  # emojis no console do Windows
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
+import config
 from src.pipeline import RAGPipeline
 
 
@@ -44,17 +45,23 @@ def print_sources(result: dict) -> None:
         print("\n📎 Nenhuma fonte citada (use -v para ver o que foi recuperado)")
 
 
-def run(pipeline: RAGPipeline, question: str, verbose: bool, retrieve_only: bool) -> None:
+def run(pipeline: RAGPipeline, question: str, verbose: bool, retrieve_only: bool, history: list | None = None) -> None:
     if retrieve_only:
         print_retrieval(pipeline.retrieve(question))
         return
 
     print("\n💬 ", end="")
-    result = pipeline.ask(question, stream=lambda t: print(t, end="", flush=True))
+    result = pipeline.ask(question, stream=lambda t: print(t, end="", flush=True), history=history)
     print()
     print_sources(result)
+    if result["search_query"] != question:
+        print(f"\n  🔎 Buscou por: {result['search_query']}")
     if verbose:
         print_retrieval(result["retrieval"])
+    if history is not None:
+        n = config.generation_config.history_turns * 2
+        history[:] = (history + [{"role": "user", "content": question},
+                                 {"role": "assistant", "content": result["answer"]}])[-n:] if n else []
 
 
 def main():
@@ -73,7 +80,8 @@ def main():
         run(pipeline, args.question, args.verbose, args.retrieve_only)
         return
 
-    print("\n🤖 RAG — modo interativo (digite 'sair' para encerrar)")
+    print("\n🤖 RAG — modo interativo (digite 'sair' para encerrar, 'nova' para esquecer a conversa)")
+    history = []
     while True:
         try:
             question = input("\n❓ ").strip()
@@ -81,8 +89,12 @@ def main():
             break
         if question.lower() in {"sair", "exit", "quit", "q"}:
             break
+        if question.lower() == "nova":
+            history.clear()
+            print("  🧹 Conversa reiniciada.")
+            continue
         if question:
-            run(pipeline, question, args.verbose, args.retrieve_only)
+            run(pipeline, question, args.verbose, args.retrieve_only, history)
 
 
 if __name__ == "__main__":

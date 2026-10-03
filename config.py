@@ -185,6 +185,12 @@ class GenerationConfig:
     max_context_chars: int = 12000
     # Reordena docs para evitar "lost in the middle"
     reorder_lost_in_middle: bool = True
+    # Histórico da conversa: quantas trocas (pergunta + resposta) entram no
+    # prompt e quanto espaço elas podem ocupar. Disputa a janela do modelo com
+    # os documentos: com Ollama, max_context_chars + max_history_chars precisa
+    # caber em OLLAMA_NUM_CTX (~3 chars/token, com folga para as instruções).
+    history_turns: int = 3
+    max_history_chars: int = 3000
 
 
 # Opções dos seletores da interface web (app/server.py). Cada combinação

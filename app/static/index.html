@@ -181,6 +181,8 @@
     <div class="options">
       <label class="model-pick" id="model-pick" hidden title="Modelo do Ollama usado na resposta e também no multi-query e no HyDE. Modelos maiores seguem melhor as regras de citação, mas são mais lentos. Para ter mais opções: ollama pull <modelo>">
         Modelo <select id="opt-model"></select></label>
+      <label class="toggle" title="Usa as últimas trocas desta conversa para entender perguntas de acompanhamento (&quot;e o segundo?&quot;, &quot;isso vale para estagiários?&quot;). Antes da busca, o modelo reescreve a pergunta como independente; custa uma chamada extra ao LLM a partir da 2ª pergunta.">
+        <input type="checkbox" id="opt-history"> Histórico <small>contexto</small></label>
       <label class="toggle" title="Reordena os 30 candidatos com um cross-encoder (bge-reranker-v2-m3). Mais preciso, ~1-3 s a mais por pergunta. Na primeira vez baixa/carrega ~2 GB.">
         <input type="checkbox" id="opt-rerank"> Reranker <small>mais preciso</small></label>
       <label class="toggle" title="O LLM escreve uma resposta hipotética e ela também é usada na busca vetorial. Ajuda perguntas vagas ou com vocabulário diferente dos documentos; custa uma chamada extra ao LLM.">
@@ -221,10 +223,10 @@ async function api(path, opts = {}) {
 async function loadStatus() {
   try {
     const s = await api("/api/status");
-    for (const k of ["rerank", "hyde"]) {
+    for (const k of ["rerank", "hyde", "history"]) {
       let v = null;
       try { v = localStorage.getItem(`opt-${k}`); } catch {}
-      $(`#opt-${k}`).checked = v === null ? !!s.defaults?.[k] : v === "1";
+      $(`#opt-${k}`).checked = v === null ? (k === "history" || !!s.defaults?.[k]) : v === "1";
     }
     let mq = null;
     try { mq = localStorage.getItem("opt-mq"); } catch {}
@@ -310,7 +312,7 @@ document.querySelectorAll(".tabs button").forEach(b => b.onclick = () => {
   b.classList.add("active"); $(`#pane-${b.dataset.tab}`).classList.add("active");
 });
 
-for (const k of ["rerank", "hyde"]) {
+for (const k of ["rerank", "hyde", "history"]) {
   $(`#opt-${k}`).addEventListener("change", e => { try { localStorage.setItem(`opt-${k}`, e.target.checked ? "1" : "0"); } catch {} });
 }
 
@@ -532,8 +534,9 @@ function addMsg(role, html) {
 function renderSources(msg, data) {
   const { sources, hyde, queries, options } = data;
   const used = [options?.multi_query && `multi-query (${options.multi_query})`, options?.hyde && "HyDE", options?.rerank && "reranker"].filter(Boolean);
-  const tags = [data.model, used.length && `busca com ${used.join(" + ")}`].filter(Boolean);
+  const tags = [data.model, options?.history && `histórico: ${options.history} troca(s)`, used.length && `busca com ${used.join(" + ")}`].filter(Boolean);
   if (tags.length) msg.insertAdjacentHTML("beforeend", `<div class="tags">${esc(tags.join(" · "))}</div>`);
+  if (data.search_query) msg.insertAdjacentHTML("beforeend", `<div class="tags" title="A pergunta foi reescrita com base na conversa antes da busca">🔎 buscou por: “${esc(data.search_query)}”</div>`);
   if (queries?.length) msg.insertAdjacentHTML("beforeend", `<details class="hyde"><summary>Variações da pergunta usadas na busca (multi-query)</summary><ol>${queries.map(q => `<li>${esc(q)}</li>`).join("")}</ol></details>`);
   if (hyde) msg.insertAdjacentHTML("beforeend", `<details class="hyde"><summary>Documento hipotético usado na busca (HyDE)</summary><div>${esc(hyde)}</div></details>`);
   if (!sources?.length) return;
@@ -560,7 +563,7 @@ async function ask(question) {
   const bubble = msg.querySelector(".bubble");
   let text = "";
   try {
-    const r = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question, conversation_id: currentConv, rerank: $("#opt-rerank").checked, hyde: $("#opt-hyde").checked, multi_query: mqValue(), model: $("#opt-model").value || null }) });
+    const r = await fetch("/api/ask", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ question, conversation_id: currentConv, use_history: $("#opt-history").checked, rerank: $("#opt-rerank").checked, hyde: $("#opt-hyde").checked, multi_query: mqValue(), model: $("#opt-model").value || null }) });
     if (!r.ok) throw new Error((await r.json()).detail || r.statusText);
     const follow = () => msg.scrollIntoView({ block: "end" });
     await readSSE(r, {

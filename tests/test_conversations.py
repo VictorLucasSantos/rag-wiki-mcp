@@ -38,3 +38,18 @@ def test_collection_for_keeps_default_name_and_separates_combinations():
     assert collection_for(model) == collection_for(model, strategy) == base
     names = {collection_for(m, s) for m in (model, "intfloat/multilingual-e5-small") for s in (strategy, "parent_child")}
     assert len(names) == 4
+
+
+def test_history_from_keeps_last_turns_and_skips_errors():
+    from app.conversations import history_from
+    conv = {"messages": [
+        {"role": "user", "content": "p1", "meta": {}},
+        {"role": "assistant", "content": "r1", "meta": {}},
+        {"role": "user", "content": "p2", "meta": {}},
+        {"role": "assistant", "content": "Ollama fora do ar", "meta": {"error": True}},
+        {"role": "user", "content": "p3", "meta": {}},
+        {"role": "assistant", "content": "r3", "meta": {}},
+    ]}
+    assert [m["content"] for m in history_from(conv, 3)] == ["p1", "r1", "p3", "r3"]
+    assert [m["content"] for m in history_from(conv, 1)] == ["p3", "r3"]
+    assert history_from(conv, 0) == [] and history_from({"messages": []}, 3) == []

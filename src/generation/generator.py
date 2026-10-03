@@ -30,23 +30,35 @@ class RAGGenerator:
         print(result["answer"], result["sources"])
     """
 
-    def __init__(self, llm, max_tokens: int = 16000, max_context_chars: int = 12000, reorder: bool = True):
+    def __init__(
+        self,
+        llm,
+        max_tokens: int = 16000,
+        max_context_chars: int = 12000,
+        reorder: bool = True,
+        max_history_chars: int = 3000,
+    ):
         self.llm = llm
         self.max_tokens = max_tokens
         self.max_context_chars = max_context_chars
         self.reorder = reorder
+        self.max_history_chars = max_history_chars
 
-    def generate(self, question: str, docs: list[dict], on_text=None) -> dict:
+    def generate(self, question: str, docs: list[dict], on_text=None, history: list[dict] | None = None) -> dict:
         """
         Retorna {"answer", "sources", "cited", "num_docs", "model", "usage", "query"}.
         on_text: callback opcional de streaming.
+        history: trocas anteriores da conversa (ver prompt_builder.format_history).
         """
         if not docs:
             if on_text:
                 on_text(NOT_FOUND)
             return self._result(question, NOT_FOUND, [], docs)
 
-        system, user, sources = build_messages(question, docs, self.max_context_chars, self.reorder)
+        system, user, sources = build_messages(
+            question, docs, self.max_context_chars, self.reorder,
+            history=history, max_history_chars=self.max_history_chars,
+        )
         response = self.llm.complete(user, system=system, max_tokens=self.max_tokens, on_text=on_text)
 
         if response.refused:

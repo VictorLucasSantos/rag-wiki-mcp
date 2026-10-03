@@ -44,6 +44,22 @@ def make_title(text: str, limit: int = 60) -> str:
     return title if len(title) <= limit else title[: limit - 1].rstrip() + "…"
 
 
+def history_from(conv: dict, turns: int) -> list[dict]:
+    """
+    As últimas `turns` trocas completas (pergunta + resposta) de uma conversa,
+    no formato que RAGPipeline.ask espera. Respostas que foram erro ficam de fora
+    junto com a pergunta delas.
+    """
+    pairs, pending = [], None
+    for m in conv.get("messages", []):
+        if m["role"] == "user":
+            pending = m["content"]
+        elif pending is not None and not m.get("meta", {}).get("error"):
+            pairs.append([{"role": "user", "content": pending}, {"role": "assistant", "content": m["content"]}])
+            pending = None
+    return [msg for pair in (pairs[-turns:] if turns > 0 else []) for msg in pair]
+
+
 class ConversationStore:
     def __init__(self, path: str | Path):
         self.path = Path(path)
