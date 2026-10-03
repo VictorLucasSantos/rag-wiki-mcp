@@ -1,8 +1,10 @@
 from types import SimpleNamespace
 
+import config
 from config import RetrievalConfig
 from src.evaluation.metrics import aggregate, retrieval_metrics
 from src.ingestion.chunker import Chunk
+from src.pipeline import collection_for
 from src.retrieval.hybrid_search import BM25Retriever, reciprocal_rank_fusion, tokenize
 from src.retrieval.parent_store import ParentStore
 from src.retrieval.retriever import Retriever
@@ -94,3 +96,11 @@ def test_retrieval_metrics():
     assert m == {"hit": True, "reciprocal_rank": 0.5, "recall": 1.0}
     assert retrieval_metrics(docs, ["zzz.md"])["hit"] is False
     assert aggregate([m, {"hit": False, "reciprocal_rank": 0.0, "recall": 0.0}])["hit"] == 0.5
+
+
+def test_collection_for_keeps_default_name_and_separates_combinations():
+    base = config.vector_store_config.collection_name
+    model, strategy = config.embedding_config.model_name, config.chunking_config.strategy
+    assert collection_for(model) == collection_for(model, strategy) == base
+    names = {collection_for(m, s) for m in (model, "intfloat/multilingual-e5-small") for s in (strategy, "parent_child")}
+    assert len(names) == 4

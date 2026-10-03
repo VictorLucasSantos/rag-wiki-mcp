@@ -193,22 +193,6 @@ class GenerationConfig:
     max_history_chars: int = 3000
 
 
-# Opções dos seletores da interface web (app/server.py). Cada combinação
-# embedding + chunker ganha a sua própria coleção no vector store: trocar não
-# apaga os outros índices, e voltar para uma combinação já usada é instantâneo.
-EMBEDDING_CHOICES = {
-    "BAAI/bge-m3": "multilíngue, 1024 dim, ~2,3 GB — melhor em PT-BR",
-    "intfloat/multilingual-e5-large": "multilíngue, 1024 dim, ~2,2 GB",
-    "intfloat/multilingual-e5-small": "multilíngue, 384 dim, ~470 MB — rápido, menos preciso",
-}
-CHUNKER_CHOICES = {
-    "auto": "markdown para .md, recursive para o resto (recomendado)",
-    "recursive": "tamanho fixo (~1500 caracteres) cortando em parágrafos e frases",
-    "markdown": "um trecho por seção, respeitando os títulos",
-    "parent_child": "busca em trechos de 400 caracteres, entrega trechos de 3000 ao LLM",
-}
-
-
 # ─────────────────────────────────────────────────────────────
 # INSTÂNCIAS GLOBAIS (uso simples)
 # ─────────────────────────────────────────────────────────────

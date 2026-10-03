@@ -1,11 +1,21 @@
-# RAG — Retrieval-Augmented Generation
+# RAG da wiki de engenharia
 
-Projeto Python de RAG baseado no guia
-[RAG: do conceito à produção](https://lemon.dev.br/pt/blog/rag-guia-completo).
+Núcleo de RAG que vai alimentar um **servidor MCP para o Claude**: o time pergunta
+ao Claude sobre o contexto de programação da empresa (tabelas do banco, fluxo de
+desenvolvimento de cada chamado), e o MCP entrega o conteúdo da wiki interna.
+
+Baseado no guia [RAG: do conceito à produção](https://lemon.dev.br/pt/blog/rag-guia-completo).
 Usa embeddings locais (BAAI/bge-m3, bom em PT-BR), Chroma ou Qdrant como banco
-vetorial, busca híbrida (vetorial + BM25 com RRF) e gera respostas com citações
-usando um **modelo local via Ollama** (padrão, grátis, nada sai da máquina) ou
-**Claude** pela API.
+vetorial e busca híbrida (vetorial + BM25 com RRF). Para testes pela linha de
+comando, gera respostas com citações usando um modelo local via Ollama ou Claude pela API.
+
+## 🗺️ Próximos passos
+
+- [ ] Servidor MCP com `search_wiki` e `get_page` (o Claude gera a resposta; o MCP só busca)
+- [ ] Páginas de tabela: `describe_table`, `search_tables` e `related_tables`, com a estrutura gerada do schema do banco
+- [ ] Páginas de processo por tipo de chamado (`get_process`)
+- [ ] Conector da wiki (API e webhooks) no lugar da pasta `docs/`
+- [ ] Chunking que não corta blocos de código, e BM25 que separa camelCase e snake_case
 
 ---
 
@@ -28,9 +38,6 @@ python scripts/index_documents.py --source docs
 # 4. Pergunte
 python scripts/query.py -q "Quantos dias de férias eu tenho?"
 python scripts/query.py            # modo interativo
-
-# 4b. Ou use a interface web: envia arquivos, cola texto, remove documentos e conversa
-python app/server.py               # http://127.0.0.1:8765
 
 # 5. Avalie
 python scripts/evaluate.py         # retrieval (grátis)
@@ -75,9 +82,6 @@ src/
   pipeline.py                  # Indexer (incremental) e RAGPipeline
 
 scripts/                       # index_documents.py, query.py, evaluate.py
-app/server.py                  # interface web (FastAPI): base, seletores de índice/modelo, chat com streaming
-app/conversations.py           # histórico de conversas (SQLite em data/conversations.db)
-app/static/index.html          # página única, sem build
 tests/                         # testes unitários (sem rede, sem API)
 ```
 
@@ -131,10 +135,7 @@ Tudo fica em `config.py`, e a maior parte também pode ser definida no `.env`:
   Se aumentar `max_context_chars`, aumente `OLLAMA_NUM_CTX` junto, porque o Ollama corta o excesso sem avisar.
 - **Claude**: `LLM_MODEL` (padrão `claude-opus-5-5`) e `LLM_EFFORT`
   (`low` / `medium` / `high`). Para gastar menos, troque por `claude-sonnet-5-5`.
-- **Trocou de modelo de embedding ou de chunker?** Na linha de comando, rode com `--rebuild`.
-  Na interface web, use os seletores da aba Base: cada combinação embedding + chunker
-  tem o seu próprio índice, então dá para alternar sem perder nenhum (a escolha fica
-  em `data/ui_state.json` e vale só para a interface; os scripts seguem o `.env`).
+- **Trocou de modelo de embedding ou de chunker?** Rode a indexação com `--rebuild`.
 - **PDFs com tabelas**: troque o pypdf por unstructured/pymupdf em `loader.py::_load_pdf`.
 - **Produção**: `VECTOR_BACKEND=qdrant` + `pip install qdrant-client` +
   `docker run -p 6333:6333 qdrant/qdrant`.
